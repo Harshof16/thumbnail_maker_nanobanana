@@ -80,18 +80,6 @@ export async function rewritePrompt(prompt: string) {
   return prompt;
 }
 
-/**
- * Calls Google's Vertex AI image model (Gemini Nano Banana / Gemini 2.5 Flash Image) to generate an edited image.
- * Environment variables used:
- *  - GOOGLE_PROJECT_ID
- *  - GOOGLE_LOCATION (e.g. us-central1)
- *  - GEMINI_API_KEY (or set up proper OAuth/Bearer token)
- *  - GOOGLE_IMAGE_MODEL (the model id, default: 'gemini-image-1-mini' placeholder)
- *
- * The exact REST contract for Vertex's image models may change; this helper attempts a best-effort POST to the
- * models:predict endpoint and expects base64 PNG/JPEG bytes in the response. If the endpoint or response differs
- * you'll need to adjust the payload shape accordingly based on Google Cloud docs.
- */
 export async function generateImageWithVertex(prompt: string, baseImageB64?: string, size = '1280x720') {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const modelForOpenAI = process.env.OPENAI_IMAGE_MODEL || process.env.GOOGLE_IMAGE_MODEL || 'google/gemini-2.5-flash-image-preview';

@@ -69,11 +69,27 @@ export async function POST(req: Request) {
         // If any task rejected, return the error to the client so UI can surface it
         const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
         if (rejected) {
-          const reason = rejected.reason as any;
-          const errMessage = reason?.message || String(reason) || 'Unknown model error';
-          const errCode = reason?.code || reason?.status || null;
-          console.error('Model generation error detected, returning to client', { errMessage, errCode, reason });
-          return NextResponse.json({ error: { message: errMessage, code: errCode, details: reason } }, { status: 502 });
+          const reasonRaw = rejected.reason as unknown;
+          let errMessage = 'Unknown model error';
+          let errCode: string | number | null = null;
+
+          if (typeof reasonRaw === 'string') {
+            errMessage = reasonRaw;
+          } else if (typeof reasonRaw === 'object' && reasonRaw !== null) {
+            const rr = reasonRaw as { message?: unknown; code?: unknown; status?: unknown };
+            if (typeof rr.message === 'string') errMessage = rr.message;
+            if (typeof rr.code === 'string' || typeof rr.code === 'number') errCode = rr.code as string | number;
+            else if (typeof rr.status === 'number') errCode = rr.status;
+          } else if (typeof reasonRaw !== 'undefined') {
+            try {
+              errMessage = String(reasonRaw);
+            } catch (e) {
+              /* ignore */
+            }
+          }
+
+          console.error('Model generation error detected, returning to client', { errMessage, errCode, reasonRaw });
+          return NextResponse.json({ error: { message: errMessage, code: errCode, details: reasonRaw } }, { status: 502 });
         }
 
         // Basic validation: ensure result looks like base64 (only chars and long enough)
