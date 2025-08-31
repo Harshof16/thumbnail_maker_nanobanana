@@ -2,7 +2,7 @@
 
 A small Next.js app that helps creators generate multi-ratio YouTube thumbnails using an image-capable LLM. Upload a reference image, answer a short questionnaire, and generate horizontal / vertical / square variants. The app rewrites prompts with an LLM, calls an image model (via OpenRouter / OpenAI-compatible endpoint), and returns thumbnails you can preview and download.
 
-Live demo: LIVE_LINK_PLACEHOLDER
+Live demo: [LIVE_LINK](https://thumbnail-maker-nanobanana.vercel.app/)
 
 ---
 
