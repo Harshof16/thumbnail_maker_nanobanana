@@ -2,6 +2,8 @@
 import axios from 'axios';
 import OpenAI from 'openai';
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
 
 export type Responses = {
   videoType?: string;
@@ -56,6 +58,20 @@ export async function rewritePrompt(prompt: string) {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
+      // Log the rewrite call (non-blocking)
+      (async () => {
+        try {
+          const logsDir = path.join(process.cwd(), 'logs');
+          await fs.promises.mkdir(logsDir, { recursive: true });
+          const file = path.join(logsDir, 'model_calls.log');
+          const entry = { type: 'rewrite', model: 'gpt-4o-mini', prompt: prompt.slice(0, 2000), timestamp: new Date().toISOString() };
+          await fs.promises.appendFile(file, JSON.stringify(entry) + '\n', 'utf8');
+        } catch (e) {
+          // best effort only
+          // eslint-disable-next-line no-console
+          console.warn('Failed to log rewrite call', e);
+        }
+      })();
       const res = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
@@ -82,7 +98,7 @@ export async function rewritePrompt(prompt: string) {
 
 export async function generateImageWithVertex(prompt: string, baseImageB64?: string, size = '1280x720') {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const modelForOpenAI = process.env.OPENAI_IMAGE_MODEL || process.env.GOOGLE_IMAGE_MODEL || 'google/gemini-2.5-flash-image-preview';
+  const modelForOpenAI = process.env.OPENAI_IMAGE_MODEL || process.env.GOOGLE_IMAGE_MODEL || 'google/gemini-2.5-flash-image-preview:free';
 
   if (!apiKey) {
     throw new Error('Missing OPENAI_API_KEY or OPENROUTER_API_KEY for image generation');
@@ -113,6 +129,19 @@ console.log('contentBlocks-- After', contentBlocks);
   ];
 
   console.log('messages:', messages);
+
+  // Log the image model call (best-effort, non-blocking)
+  (async () => {
+    try {
+      const logsDir = path.join(process.cwd(), 'logs');
+      await fs.promises.mkdir(logsDir, { recursive: true });
+      const file = path.join(logsDir, 'model_calls.log');
+      const entry: any = { type: 'image_generation_call', model: modelForOpenAI, prompt: prompt.slice(0, 2000), hasBaseImage: !!baseImageB64, size, timestamp: new Date().toISOString() };
+      await fs.promises.appendFile(file, JSON.stringify(entry) + '\n', 'utf8');
+    } catch (e) {
+      // ignore
+    }
+  })();
 
   try {
     console.log('calling OpenAI image model', { model: modelForOpenAI });
@@ -159,44 +188,47 @@ console.log('contentBlocks-- After', contentBlocks);
     // Some providers return generated images in choices[0].message.images as an array of objects
     const respImages = (resp as any)?.choices?.[0]?.message?.images;
     if (Array.isArray(respImages) && respImages.length > 0) {
+      const collected: string[] = [];
       for (const img of respImages) {
         try {
           // common shapes: { url: 'data:image/...base64,...' } or { data: 'base64...' } or { base64: '...' }
           if (typeof img === 'string') {
             const cleaned = extractBase64FromString(img);
-            if (cleaned) return cleaned;
+            if (cleaned) collected.push(cleaned);
           }
 
           if (img && typeof img === 'object') {
             // handle img.image_url.url shape
             if (img.image_url && typeof img.image_url?.url === 'string') {
               const cleaned = extractBase64FromString(img.image_url.url);
-              if (cleaned) return cleaned;
+              if (cleaned) collected.push(cleaned);
             }
 
             // also support some providers that put url/data/base64 at top level
             if (typeof img.url === 'string') {
               const cleaned = extractBase64FromString(img.url);
-              if (cleaned) return cleaned;
+              if (cleaned) collected.push(cleaned);
             }
             if (typeof img.data === 'string') {
               const cleaned = extractBase64FromString(img.data);
-              if (cleaned) return cleaned;
+              if (cleaned) collected.push(cleaned);
             }
             if (typeof img.base64 === 'string') {
               const cleaned = extractBase64FromString(img.base64);
-              if (cleaned) return cleaned;
+              if (cleaned) collected.push(cleaned);
             }
             // some entries are { type: 'image_url', image_url: { url: 'data:...' } }
             if (img.type === 'image_url' && img.image_url && typeof img.image_url.url === 'string') {
               const cleaned = extractBase64FromString(img.image_url.url);
-              if (cleaned) return cleaned;
+              if (cleaned) collected.push(cleaned);
             }
           }
         } catch (imgErr) {
           console.debug('error parsing respImages entry', imgErr);
         }
       }
+      if (collected.length === 1) return collected[0];
+      if (collected.length > 1) return collected;
     }
 
     // Try to locate base64 image data in known response shapes
@@ -205,30 +237,33 @@ console.log('contentBlocks-- After', contentBlocks);
 
     // If the model returned an array of content blocks (e.g. [{type: 'image_url', image_url:{url: 'data:...'}}, ...])
     if (Array.isArray(messageContent)) {
+      const collected: string[] = [];
       for (const part of messageContent) {
         try {
           // image_url blocks (OpenRouter / Vertex style)
           if (part && typeof part === 'object' && part.type === 'image_url' && typeof part.image_url?.url === 'string') {
             const cleaned = extractBase64FromString(part.image_url.url);
-            if (cleaned) return cleaned;
+            if (cleaned) collected.push(cleaned);
           }
 
           // inlineData blocks
           if (part?.inlineData?.data && typeof part.inlineData.data === 'string') {
             const cleaned = extractBase64FromString(part.inlineData.data);
-            if (cleaned) return cleaned;
+            if (cleaned) collected.push(cleaned);
           }
 
           // plain data field
           if (typeof part?.data === 'string') {
             const cleaned = extractBase64FromString(part.data);
-            if (cleaned) return cleaned;
+            if (cleaned) collected.push(cleaned);
           }
         } catch (innerErr) {
           // ignore and continue scanning other parts
           console.debug('error parsing part while extracting image', innerErr);
         }
       }
+      if (collected.length === 1) return collected[0];
+      if (collected.length > 1) return collected;
     }
 
     // If messageContent is an object that directly contains inlineData or image_url

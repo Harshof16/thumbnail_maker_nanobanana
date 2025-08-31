@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Thumbnail Maker (Next.js)
 
-## Getting Started
+A small Next.js app that helps creators generate multi-ratio YouTube thumbnails using an image-capable LLM. Upload a reference image, answer a short questionnaire, and generate horizontal / vertical / square variants. The app rewrites prompts with an LLM, calls an image model (via OpenRouter / OpenAI-compatible endpoint), and returns thumbnails you can preview and download.
 
-First, run the development server:
+Live demo: LIVE_LINK_PLACEHOLDER
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+---
+
+## Quick start
+
+Requirements
+- Node.js 18+ (recommended)
+- pnpm (used by this project) or npm/yarn
+
+Install dependencies and run locally:
+
+```powershell
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Build for production:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+pnpm build
+pnpm start
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Required environment variables
+Create a `.env.local` file in the project root with at least:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+# OpenRouter / OpenAI-compatible key used for image generation
+OPENROUTER_API_KEY=your_openrouter_key_here
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Optional: OpenAI key for prompt rewriting (chat completion)
+OPENAI_API_KEY=your_openai_key_here
 
-## Deploy on Vercel
+# Optional: base URL used when generating public upload URLs (defaults to http://localhost:3000)
+APP_BASE_URL=http://localhost:3000
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Notes
+- The app tries to avoid inlining large base64 payloads into chat messages by saving uploads and passing a public URL to the model when possible.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Folder structure
+Top-level important files and folders:
+
+```
+/.next/                  # build output (ignored)
+logs/                    # runtime logs created by the app (model call logs)
+public/                  # static assets and public uploads
+src/
+  app/                   # Next.js app router pages & api
+    api/generatethumbnails/route.ts   # backend orchestrator for generating thumbnails
+    page.tsx              # main UI page
+  components/             # React components (thumbnailGrid, questionnaire, header, etc.)
+  lib/                    # helpers: prompt builder, image generation helper
+package.json
+pnpm-lock.yaml
+README.md
+```
+
+Logging
+- Model-call and prompt rewrite logs are appended to `logs/model_calls.log` as newline-delimited JSON. This file is created on-demand by the server and useful for debugging which prompts were sent to the model and when.
+
+---
+
+## How it works (high level)
+- User uploads a reference image and fills the questionnaire.
+- Server builds a system prompt via `src/lib/prompt.ts` and optionally rewrites it using a chat LLM.
+- The server calls the image model (OpenRouter/OpenAI-compatible) and asks for multi-ratio outputs.
+- Results are returned as base64 data URLs to the client and displayed in the grid; you can preview, download, or zip them.
+
+## Development tips
+- To inspect model-call logs in real time (PowerShell):
+
+```powershell
+Get-Content .\\logs\\model_calls.log -Wait
+```
+

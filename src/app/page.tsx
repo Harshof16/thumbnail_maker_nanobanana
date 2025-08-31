@@ -79,7 +79,7 @@ export default function Home() {
               <h1 className="text-3xl md:text-4xl font-bold text-white">Make Click-worthy YouTube Thumbnails — Fast.</h1>
               <p className="mt-2 text-red-200/80 max-w-2xl">Upload a photo, answer a few quick questions, and generate polished thumbnails for horizontal, vertical and square formats — powered by AI.</p>
               <div className="mt-4">
-                <a href="#generate" className="inline-block px-5 py-3 bg-red-600 hover:bg-red-700 rounded text-white font-semibold">Generate Thumbnails</a>
+                <a href="#generate" className="inline-block px-5 py-3 bg-red-600/90 hover:bg-red-700/95 rounded text-white font-semibold">Generate Thumbnails</a>
                 <a href="#how" className="ml-4 text-sm text-red-300/80 hover:text-red-100">How it works</a>
               </div>
             </div>

@@ -34,7 +34,8 @@ export default function Questionnaire({ onComplete, responses, setResponses, loa
   const [placement, setPlacement] = useState('center');
 
   const handleSubmit = () => {
-    if (Object.keys(responses).length === questions.length) {
+    if (Object.keys(responses).length >= questions.length) {
+      console.log('clicked')
       onComplete(responses, placement);
     }
   };
@@ -98,7 +99,7 @@ export default function Questionnaire({ onComplete, responses, setResponses, loa
       <button
         onClick={handleSubmit}
         disabled={Object.keys(responses).length < questions.length || !!loading}
-        className="w-full py-4 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center space-x-2"
+        className="w-full py-4 bg-gradient-to-r cursor-pointer bg-red-600/90 hover:bg-red-700/95 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center space-x-2"
       >
         {loading ? (
           <>

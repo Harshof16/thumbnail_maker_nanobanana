@@ -92,7 +92,7 @@ export default function ThumbnailGrid({ thumbnails, onCustomize, onRegenerate, l
               onClick={() => setSelectedRatio(key)}
               className={`px-4 py-2 rounded-lg font-medium transition-all
                 ${selectedRatio === key
-                  ? 'bg-red-500 text-white'
+                  ? 'bg-red-600/90 hover:bg-red-700/95 text-white'
                   : 'bg-white/10 text-red-200 hover:bg-white/20'
                 }`}
             >
@@ -104,14 +104,14 @@ export default function ThumbnailGrid({ thumbnails, onCustomize, onRegenerate, l
         <div className="flex space-x-2">
           <button
             onClick={onRegenerate}
-            className="flex items-center space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-red-200 transition-all"
+            className="flex items-center cursor-pointer space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-red-200 transition-all"
           >
             <RotateCcw size={16} />
             <span>Regenerate</span>
           </button>
           <button
             onClick={downloadAll}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white transition-all"
+            className="flex items-center cursor-pointer space-x-2 px-4 py-2 bg-red-600/90 hover:bg-red-700/95 rounded-lg text-white transition-all"
           >
             <Download size={16} />
             <span>Download All</span>
@@ -194,8 +194,8 @@ export default function ThumbnailGrid({ thumbnails, onCustomize, onRegenerate, l
       </div>
       {/* Modal for large preview */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 overlay-animate" onClick={() => setModalOpen(false)}>
-          <div className="bg-neutral-900/95 rounded-lg p-4 max-w-3xl w-full mx-4 shadow-xl border border-red-700/30 modal-pop" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 overflow-auto flex items-start justify-center pt-10 pb-10 bg-black/90 overlay-animate" onClick={() => setModalOpen(false)}>
+          <div className="bg-neutral-900/95 rounded-lg p-4 max-w-3xl w-full mx-4 shadow-xl border border-red-700/30 modal-pop overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="relative w-full h-[60vh]">
               <Image src={modalImage} alt="Preview" fill className="object-contain" unoptimized />
             </div>

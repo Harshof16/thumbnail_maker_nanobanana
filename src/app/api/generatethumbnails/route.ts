@@ -45,63 +45,66 @@ export async function POST(req: Request) {
     type Thumbnail = { id: string; prompt: string; horizontal: string; vertical: string; square: string };
     const thumbnails: Thumbnail[] = [];
 
+    // Add dynamic variation-level focuses so each variation differs
+    const variationFocuses = [
+      'focus on strong subject separation and bold typography',
+      'focus on dramatic lighting and energetic color contrasts',
+      'focus on a close-up expressive subject and minimal on-screen text'
+    ];
+
     for (let i = 0; i < 3; i++) {
-      // create ratio-specific prompts
-      const baseVariant = `${rewritten} Variation ${i + 1}: focus on strong subject separation and bold typography.`;
+      // create ratio-specific prompts; each variation has a different focus
+      const variationFocus = variationFocuses[i] ?? `variation ${i + 1}`;
+      const baseVariant = `${rewritten} Variation ${i + 1}: ${variationFocus}.`;
       const promptsByRatio = {
-        horizontal: `${baseVariant} Generate for horizontal (16:9) composition.`,
-        vertical: `${baseVariant} Generate for vertical (9:16) composition.`,
-        square: `${baseVariant} Generate for square (1:1) composition.`,
+        horizontal: `${baseVariant} Generate for horizontal (16:9) composition. Emphasize landscape framing, negative space on the right, and large headline text area.`,
+        vertical: `${baseVariant} Generate for vertical (9:16) composition. Emphasize tall framing, subject-centered or top-aligned composition, and readable headline placement for mobile.`,
+        square: `${baseVariant} Generate for square (1:1) composition. Emphasize centered subject, balanced negative space, and typography that reads in square crops.`,
       } as const;
 
       try {
-        // Run the three size requests in parallel to reduce latency
-        const tasks = [
-          generateImageWithVertex(promptsByRatio.horizontal, baseImageB64, sizes.horizontal),
-          generateImageWithVertex(promptsByRatio.vertical, baseImageB64, sizes.vertical),
-          generateImageWithVertex(promptsByRatio.square, baseImageB64, sizes.square),
-        ];
+  // Call the image model once per variant and explicitly request 3 images with distinct
+  // aspect ratios so the model returns outputs for horizontal, vertical and square.
+  // Build a structured prompt that provides a distinct sub-prompt per ratio and asks
+  // the model to return a JSON object with three separate image values. This reduces
+  // the chance the model composes all variants into a single grid image.
+  const combinedPrompt = `
+${baseVariant}
+Please produce three separate images for this variation. Do NOT place multiple aspect
+ratios inside a single composited image or grid—each output must be a separate image.
 
-        const results = await Promise.allSettled(tasks);
+Provide the images as a JSON object with exact keys: "horizontal", "vertical", "square".
+Each value should be a data URL (data:image/jpeg;base64,...) or a raw base64 string. Do not
+include additional explanatory text or analysis outside the JSON object.
 
-        const settled = results.map((r) => (r.status === 'fulfilled' ? (r as PromiseFulfilledResult<string>).value : null));
+Sub-prompts (use these to render each image):
+HORIZONTAL (16:9, ${sizes.horizontal}): ${promptsByRatio.horizontal}
+VERTICAL  (9:16, ${sizes.vertical}): ${promptsByRatio.vertical}
+SQUARE    (1:1,  ${sizes.square}): ${promptsByRatio.square}
 
-        // If any task rejected, return the error to the client so UI can surface it
-        const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
-        if (rejected) {
-          const reasonRaw = rejected.reason as unknown;
-          let errMessage = 'Unknown model error';
-          let errCode: string | number | null = null;
+Return strictly a JSON object like {"horizontal":"data:...","vertical":"data:...","square":"data:..."}.
+`;
 
-          if (typeof reasonRaw === 'string') {
-            errMessage = reasonRaw;
-          } else if (typeof reasonRaw === 'object' && reasonRaw !== null) {
-            const rr = reasonRaw as { message?: unknown; code?: unknown; status?: unknown };
-            if (typeof rr.message === 'string') errMessage = rr.message;
-            if (typeof rr.code === 'string' || typeof rr.code === 'number') errCode = rr.code as string | number;
-            else if (typeof rr.status === 'number') errCode = rr.status;
-          } else if (typeof reasonRaw !== 'undefined') {
-            try {
-              errMessage = String(reasonRaw);
-            } catch (e) {
-              /* ignore */
-            }
-          }
+  const result = await generateImageWithVertex(combinedPrompt, baseImageB64, sizes.horizontal);
 
-          console.error('Model generation error detected, returning to client', { errMessage, errCode, reasonRaw });
-          return NextResponse.json({ error: { message: errMessage, code: errCode, details: reasonRaw } }, { status: 502 });
-        }
-
-        // Basic validation: ensure result looks like base64 (only chars and long enough)
+        // result may be string or string[]
         const isProbablyBase64 = (s: string | null) => typeof s === 'string' && /^[A-Za-z0-9+/=\s]+$/.test(s) && s.replace(/\s+/g, '').length > 200;
 
-        const [horizontalB64, verticalB64, squareB64] = settled.map((val) => (isProbablyBase64(val) ? val!.replace(/\s+/g, '') : null));
+        let horizontalB64: string | null = null;
+        let verticalB64: string | null = null;
+        let squareB64: string | null = null;
 
-        console.log('Parallel generation results for variant', i + 1, {
-          horizontal: !!horizontalB64,
-          vertical: !!verticalB64,
-          square: !!squareB64,
-        });
+        if (Array.isArray(result)) {
+          const arr = result as string[];
+          horizontalB64 = isProbablyBase64(arr[0]) ? arr[0].replace(/\s+/g, '') : null;
+          verticalB64 = isProbablyBase64(arr[1]) ? arr[1].replace(/\s+/g, '') : null;
+          squareB64 = isProbablyBase64(arr[2]) ? arr[2].replace(/\s+/g, '') : null;
+        } else if (typeof result === 'string') {
+          // single string returned; assume it's for horizontal and fall back placeholders for others
+          horizontalB64 = isProbablyBase64(result) ? result.replace(/\s+/g, '') : null;
+        }
+
+        console.log('Generation results for variant', i + 1, { horizontal: !!horizontalB64, vertical: !!verticalB64, square: !!squareB64 });
 
         const makeDataUrl = (b64: string | null, fallback: string) => b64 ? `data:image/jpeg;base64,${b64}` : fallback;
 
